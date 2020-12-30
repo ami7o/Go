@@ -34,11 +34,11 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 EMPTY, BLACK, WHITE = 0, 1, 2
 
-blackImg = pygame.image.load('black.png')
-whiteImg = pygame.image.load('white.png')
-offImg = pygame.image.load('switch_off.png')
-onImg = pygame.image.load('switch_on.png')
-resetImg = pygame.image.load('reset.png')
+blackImg = pygame.image.load('images/black.png')
+whiteImg = pygame.image.load('images/white.png')
+offImg = pygame.image.load('images/switch_off.png')
+onImg = pygame.image.load('images/switch_on.png')
+resetImg = pygame.image.load('images/reset.png')
 images = []
 images.append(pygame.transform.scale(blackImg, (GRIDSIZE, GRIDSIZE)))
 images.append(pygame.transform.scale(whiteImg, (GRIDSIZE, GRIDSIZE)))
@@ -146,6 +146,9 @@ if __name__ == '__main__':
                             mode = BLACK
                             switch = True
                             drawBoard(grid, mode, switch)
+            elif event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
 
         pygame.display.flip()
         pygame.display.update()
