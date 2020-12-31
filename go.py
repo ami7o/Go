@@ -1,11 +1,12 @@
 import pygame
 from pygame.locals import *
+import os
 import sys
 import time
 import random
 import numpy as np
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 root = tk.Tk()
 root.withdraw()
@@ -18,7 +19,7 @@ fpsClock=pygame.time.Clock()
 GRIDSIZE = 32
 SIZE = 19
 MARGIN = 32
-MENU = 100
+MENU = 120
 screen = pygame.display.set_mode((GRIDSIZE * (SIZE - 1) + MARGIN * 2 + MENU, \
      GRIDSIZE * (SIZE - 1) + MARGIN * 2), 0, 32)
 surface = pygame.Surface(screen.get_size())
@@ -43,6 +44,9 @@ whiteImg = pygame.image.load('images/white.png')
 offImg = pygame.image.load('images/switch_off.png')
 onImg = pygame.image.load('images/switch_on.png')
 resetImg = pygame.image.load('images/reset.png')
+undoImg = pygame.image.load('images/undo.png')
+saveImg = pygame.image.load('images/save.png')
+
 images = []
 images.append(pygame.transform.scale(blackImg, (GRIDSIZE, GRIDSIZE)))
 images.append(pygame.transform.scale(whiteImg, (GRIDSIZE, GRIDSIZE)))
@@ -53,12 +57,17 @@ buttons.append(pygame.transform.scale(whiteImg, (BUTTON_DIAMETER, BUTTON_DIAMETE
 buttons.append(pygame.transform.scale(offImg, (BUTTON_WIDTH, BUTTON_HEIGHT)))
 buttons.append(pygame.transform.scale(onImg, (BUTTON_WIDTH, BUTTON_HEIGHT)))
 buttons.append(pygame.transform.scale(resetImg, (BUTTON_WIDTH, BUTTON_HEIGHT)))
+buttons.append(pygame.transform.scale(undoImg, (BUTTON_WIDTH, BUTTON_HEIGHT)))
+buttons.append(pygame.transform.scale(saveImg, (BUTTON_WIDTH, BUTTON_HEIGHT)))
 
 button_positions = []
-button_positions.append((620, 50))
-button_positions.append((620, 200))
-button_positions.append((620, 400))
-button_positions.append((620, 500))
+button_positions.append((630, 50))
+button_positions.append((630, 180))
+button_positions.append((620, 300))
+button_positions.append((620, 300))
+button_positions.append((620, 380))
+button_positions.append((620, 460))
+button_positions.append((620, 540))
 
 # return real position given x y
 def getPosition(x, y):
@@ -85,7 +94,8 @@ def drawButton(mode):
     (redX, redY) = button_positions[mode - 1]
     pygame.draw.circle(screen, RED, (redX + BUTTON_DIAMETER / 2, redY + BUTTON_DIAMETER / 2), 10)
     screen.blit(buttons[3 if switch else 2], button_positions[2])
-    screen.blit(buttons[4], button_positions[3])
+    for i in range(4, len(buttons)): # rest of buttons
+        screen.blit(buttons[i], button_positions[i])
 
 # draw board
 def drawBoard(grid, mode, switch):
@@ -142,12 +152,25 @@ def autoCheck(grid, x, y, color):
     # check this color
     checkEat(grid, x, y, color)
 
+# check if mouse is on the button with the given index
+def checkButton(mouseX, mouseY, index):
+    return button_positions[index][0] <= mouseX <= button_positions[index][0] + BUTTON_WIDTH \
+        and button_positions[index][1] <= mouseY <= button_positions[index][1] + BUTTON_HEIGHT
+
+
+def addHistory(history, index, grid):
+    temp = history[:index+1]
+    temp.append(grid.copy())
+    return temp
+
 if __name__ == '__main__':
     grid = np.zeros((SIZE, SIZE))
     mode = BLACK
     check = True
     switch = True
     drawBoard(grid, mode, switch)
+    history = [grid.copy()]
+    index = 0
     
     while True:
         ev = pygame.event.get()
@@ -165,6 +188,8 @@ if __name__ == '__main__':
                             mode = 3 - mode
                     else: # remove stone
                         grid[x][y] = EMPTY
+                    history = addHistory(history, index, grid)
+                    index += 1
                     drawBoard(grid, mode, switch)
                 else: # pressed outside the board
                     # find distance to 
@@ -178,16 +203,44 @@ if __name__ == '__main__':
                     elif whiteDis <= BUTTON_DIAMETER / 2: # white stone
                         mode = WHITE
                         drawButton(mode)
-                    elif button_positions[2][0] <= mouseX <= button_positions[2][0] + BUTTON_WIDTH \
-                        and button_positions[2][1] <= mouseY <= button_positions[2][1] + BUTTON_HEIGHT: # switch
+                    elif checkButton(mouseX, mouseY, 2): # switch
                         switch = not switch
                         drawButton(mode)
-                    elif button_positions[3][0] <= mouseX <= button_positions[3][0] + BUTTON_WIDTH \
-                        and button_positions[3][1] <= mouseY <= button_positions[3][1] + BUTTON_HEIGHT: # reset
+                    elif checkButton(mouseX, mouseY, 4): # reset
                         MsgBox = messagebox.askquestion('Warning', 'Are you sure you want to reset?', icon = 'warning')
                         if MsgBox == 'yes':
                             grid = np.zeros((SIZE, SIZE))
                             drawBoard(grid, mode, switch)
+                            history = addHistory(history, index, grid)
+                            index += 1
+                    elif checkButton(mouseX, mouseY, 5): # undo/redo
+                        if mouseX <= button_positions[5][0] + BUTTON_WIDTH / 2: # undo
+                            if index > 0:
+                                index -= 1
+                                grid = history[index].copy()
+                                drawBoard(grid, mode, switch)
+                        else: # redo
+                            if index < len(history) - 1:
+                                index += 1
+                                grid = history[index].copy()
+                                drawBoard(grid, mode, switch)
+                    elif checkButton(mouseX, mouseY, 6): # save/load
+                        if mouseX <= button_positions[6][0] + BUTTON_WIDTH / 2: # save
+                            filename = simpledialog.askstring('Save', 'Enter filename to save')
+                            if filename != None:
+                                with open(f'saved/{filename}.npy', 'wb') as f:
+                                    np.save(f, np.array(grid))
+                                messagebox.showinfo('Saved', f'Successfully saved to saved/{filename}.npy')
+                        else: # load
+                            filename = simpledialog.askstring('Load', 'Enter filename to load')
+                            if os.path.exists(f'saved/{filename}.npy'):
+                                with open(f'saved/{filename}.npy', 'rb') as f:
+                                    grid = np.load(f)
+                                drawBoard(grid, mode, switch)
+                                history = addHistory(history, index, grid)
+                                index += 1
+                            else:
+                                messagebox.showerror('Not found', f'saved/{filename}.npy does not exist')
             elif event.type == pygame.QUIT:
                 pygame.quit()
                 exit()
